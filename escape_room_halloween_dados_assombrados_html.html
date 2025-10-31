@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Escape Room Halloween – Dados Assombrados</title>
+  <style>
+    :root{
+      --bg:#0b0b10;--panel:#14141c;--ink:#f2f2f7;--muted:#b3b3c2;--accent:#ff7a00;--accent2:#c92a2a;--ok:#2fbf71;--warn:#ffd166;--err:#ff4757;
+    }
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 800px at 70% -10%, #1a1a24 0%, #0b0b10 50%, #000 100%);
+      color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
+    header{position:sticky;top:0;z-index:5;background:rgba(11,11,16,.7);backdrop-filter:blur(6px);border-bottom:1px solid #222}
+    .bar{display:flex;gap:16px;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto;padding:12px 16px}
+    .title{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.5px}
+    .title .pumpkin{font-size:22px}
+    .timer, .progress{display:flex;align-items:center;gap:10px}
+    .chip{background:var(--panel);padding:6px 10px;border-radius:999px;border:1px solid #2a2a38;color:var(--muted);font-size:12px}
+    .timer .time{font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink)}
+    .progress .key{width:10px;height:10px;border:1px solid #2a2a38;border-radius:2px;background:#1c1c28;box-shadow:0 0 0 1px rgba(0,0,0,.2) inset}
+    .progress .key.got{background:linear-gradient(180deg,var(--accent),var(--accent2))}
+
+    main{max-width:900px;margin:24px auto;padding:0 16px}
+    section.screen{display:none;background:linear-gradient(180deg,#12121a,#0e0e14);border:1px solid #242436;border-radius:18px;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+    section.screen.active{display:block}
+    h1,h2{margin:.4em 0 .3em}
+    h1{font-size:28px}
+    h2{font-size:22px}
+    p{color:#d9d9e3;line-height:1.6}
+
+    .btn{appearance:none;border:none;border-radius:12px;padding:12px 16px;background:linear-gradient(180deg,var(--accent),#b85f00);color:#000;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(255,122,0,.25);transition:transform .06s ease}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.ghost{background:#1b1b26;color:var(--ink);border:1px solid #2a2a38;box-shadow:none}
+    .btn.link{background:transparent;border:none;color:var(--muted);text-decoration:underline;box-shadow:none;padding:0}
+
+    .grid{display:grid;gap:16px}
+    .grid.two{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+
+    .card{background:var(--panel);border:1px solid #242436;border-radius:16px;padding:16px}
+    label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px}
+    input[type="text"],input[type="date"],select,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a2a38;background:#0f0f16;color:var(--ink)}
+    textarea{min-height:100px}
+
+    .hint{margin-top:8px;font-size:13px;color:#c7c7d6}
+    .hint details{background:#15151f;border:1px dashed #2a2a38;border-radius:10px;padding:8px}
+
+    .notice{padding:10px 12px;border-radius:12px;border:1px solid #2a2a38;background:#12121a;color:#dcdced}
+    .notice.ok{border-color:#1d3c2b;background:#0e1912}
+    .notice.warn{border-color:#3a2c12;background:#18130a}
+    .notice.err{border-color:#3c1d1d;background:#190e0e}
+
+    .door{margin:18px 0;padding:18px;border-radius:14px;border:1px dashed #303048;background:linear-gradient(180deg,#11121a,#0b0b10);text-align:center}
+
+    /* Decorative */
+    .web{position:fixed;inset:0;pointer-events:none;z-index:-1}
+    .web::before,.web::after{content:"";position:absolute;border:1px solid rgba(255,255,255,.06);border-radius:50%}
+    .web::before{width:70vmin;height:70vmin;top:-10vmin;left:-10vmin}
+    .web::after{width:60vmin;height:60vmin;bottom:-8vmin;right:-8vmin}
+    .footer{color:var(--muted);text-align:center;margin:28px 0 60px}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#0e0e15;border:1px solid #2b2b3a;border-radius:6px;padding:0 6px}
+
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;text-align:center;padding:24px}
+    .overlay .panel{max-width:760px;background:#13131a;border:1px solid #2a2a38;border-radius:18px;padding:24px}
+    .overlay.show{display:flex}
+  </style>
+</head>
+<body>
+  <div class="web" aria-hidden="true"></div>
+  <header>
+    <div class="bar">
+      <div class="title"><span class="pumpkin">🎃</span> Escape Room Halloween – <span style="color:var(--accent)">Dados Assombrados</span></div>
+      <div class="timer">
+        <span class="chip">Tempo</span>
+        <span class="time" id="countdown">60:00</span>
+      </div>
+      <div class="progress" aria-label="chaves obtidas" title="Chaves obtidas">
+        <span class="chip">Chaves</span>
+        <div id="key1" class="key" aria-hidden="true"></div>
+        <div id="key2" class="key" aria-hidden="true"></div>
+        <div id="key3" class="key" aria-hidden="true"></div>
+        <div id="key4" class="key" aria-hidden="true"></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- INTRO -->
+    <section id="screen-intro" class="screen active" aria-labelledby="intro-title">
+      <h1 id="intro-title">Bem‑vindo(a), investigador(a) dos dados sombrios</h1>
+      <p>
+        Na noite de Halloween, um repositório foi amaldiçoado por práticas ruins de gestão de dados. 
+        Seu objetivo: restaurar as boas práticas, reunir <strong>4 chaves</strong> e libertar o acervo antes que o relógio chegue a zero.
+      </p>
+      <div class="grid two">
+        <div class="card">
+          <h2>Regras</h2>
+          <ul>
+            <li>Não use mecanismos de busca externos; todas as pistas estão aqui.</li>
+            <li>Trabalhe sozinho(a) ou em equipes pequenas.</li>
+            <li>Anote descobertas em papel ou editor (dica: use a tecla <span class="kbd">Ctrl</span> + <span class="kbd">S</span> para salvar capturas de tela se precisar).</li>
+            <li>Conteúdo educativo: metadados, consentimento/LGPD, anonimização e plano de gestão de dados.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Como vencer</h2>
+          <ol>
+            <li>Conclua os 4 desafios. Cada um revela uma <em>chave</em>.</li>
+            <li>Use as chaves para formar a palavra‑final e abrir a saída.</li>
+            <li>Você tem <strong>60 minutos</strong>. Boa sorte, e… cuidado com os <em>fantasmas de dados</em> 👻</li>
+          </ol>
+          <div class="door"><button class="btn" id="start">Entrar na mansão de dados</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DESAFIO 1 -->
+    <section id="screen-1" class="screen" aria-labelledby="s1-title">
+      <h2 id="s1-title">Desafio 1 — O Arquivo Perdido (Metadados)</h2>
+      <p>Um arquivo jaz esquecido na escuridão, sem metadados. Preencha a ficha para dar a ele uma nova vida.</p>
+      <div class="grid two">
+        <div class="card">
+          <label for="author">Autor(a)</label>
+          <input id="author" type="text" placeholder="Ex.: Equipe Coruja Noturna" />
+
+          <label for="date">Data de criação</label>
+          <input id="date" type="date" />
+
+          <label for="format">Formato</label>
+          <input id="format" type="text" placeholder="Ex.: CSV, JSON, XLSX, PNG" />
+
+          <label for="license">Licença</label>
+          <input id="license" type="text" placeholder="Ex.: CC BY 4.0, CC0, MIT" />
+
+          <div class="hint">
+            <details>
+              <summary>Dica</summary>
+              Preencha todos os campos. Formatos comuns: CSV/JSON/XLSX/PNG. Licenças abertas: CC0, CC BY, MIT (para código).
+            </details>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:10px">
+            <button class="btn" id="s1-check">Validar metadados</button>
+            <button class="btn ghost" id="s1-next" disabled>Avançar ▶</button>
+          </div>
+          <p id="s1-msg" class="notice" style="margin-top:10px;display:none"></p>
+        </div>
+        <div class="card">
+          <p><strong>Objetivo pedagógico:</strong> reconhecer a importância de metadados mínimos para reuso e preservação de dados.</p>
+          <ul>
+            <li>Autor(es) identificados</li>
+            <li>Data de criação/versão</li>
+            <li>Formato técnico</li>
+            <li>Licença de uso/compartilhamento</li>
+          </ul>
+          <p class="muted">Chave esperada: <em>METADADOS</em></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DESAFIO 2 -->
+    <section id="screen-2" class="screen" aria-labelledby="s2-title">
+      <h2 id="s2-title">Desafio 2 — O Consentimento Esquecido (LGPD)</h2>
+      <p>As aparições exigem permissão. Complete corretamente o consentimento para seguir adiante.</p>
+      <div class="grid two">
+        <div class="card">
+          <label for="purpose">Finalidade do uso de imagem/dados</label>
+          <input id="purpose" type="text" placeholder="Ex.: fins educacionais não comerciais" />
+
+          <label for="retention">Prazo de retenção</label>
+          <input id="retention" type="text" placeholder="Ex.: até 12 meses após término do projeto" />
+
+          <label for="contact">Contato do controlador</label>
+          <input id="contact" type="text" placeholder="Ex.: professora@escola.edu.br" />
+
+          <label><input id="optout" type="checkbox" /> Informei que a pessoa pode revogar o consentimento a qualquer tempo</label>
+
+          <div class="hint">
+            <details>
+              <summary>Dica</summary>
+              Inclua finalidade, contato do controlador, prazo e possibilidade de revogação (direito do titular segundo a LGPD).
+            </details>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:10px">
+            <button class="btn" id="s2-check">Validar consentimento</button>
+            <button class="btn ghost" id="s2-next" disabled>Avançar ▶</button>
+          </div>
+          <p id="s2-msg" class="notice" style="margin-top:10px;display:none"></p>
+        </div>
+        <div class="card">
+          <p><strong>Objetivo pedagógico:</strong> reconhecer elementos mínimos de consentimento informado conforme LGPD.</p>
+          <ul>
+            <li>Finalidade clara</li>
+            <li>Prazo de retenção</li>
+            <li>Contato do controlador</li>
+            <li>Direito de revogação</li>
+          </ul>
+          <p class="muted">Chave esperada: <em>CONSENTIMENTO</em></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DESAFIO 3 -->
+    <section id="screen-3" class="screen" aria-labelledby="s3-title">
+      <h2 id="s3-title">Desafio 3 — A Tabela Maldita (Anonimização)</h2>
+      <p>Esta pequena amostra contém dados pessoais inadequados. Identifique a coluna crítica e a ação correta.</p>
+      <div class="grid two">
+        <div class="card">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#0f0f16"><th style="text-align:left;border-bottom:1px solid #2a2a38;padding:6px">nome</th><th style="text-align:left;border-bottom:1px solid #2a2a38;padding:6px">idade</th><th style="text-align:left;border-bottom:1px solid #2a2a38;padding:6px">foto</th><th style="text-align:left;border-bottom:1px solid #2a2a38;padding:6px">RG</th></tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:6px;border-bottom:1px solid #1f1f2a">Luna</td><td style="padding:6px;border-bottom:1px solid #1f1f2a">16</td><td style="padding:6px;border-bottom:1px solid #1f1f2a">luna.jpg</td><td style="padding:6px;border-bottom:1px solid #1f1f2a">12.345.678-9</td></tr>
+              <tr><td style="padding:6px;border-bottom:1px solid #1f1f2a">Igor</td><td style="padding:6px;border-bottom:1px solid #1f1f2a">17</td><td style="padding:6px;border-bottom:1px solid #1f1f2a">igor.png</td><td style="padding:6px;border-bottom:1px solid #1f1f2a">98.765.432-1</td></tr>
+            </tbody>
+          </table>
+          <label for="s3-col">Qual coluna precisa ser removida ou tratada?</label>
+          <input id="s3-col" type="text" placeholder="Ex.: RG" />
+
+          <label for="s3-action">Qual ação correta?</label>
+          <select id="s3-action">
+            <option value="">Selecione…</option>
+            <option>Anonimização</option>
+            <option>Pseudonimização</option>
+            <option>Publicar como está</option>
+          </select>
+
+          <div class="hint">
+            <details>
+              <summary>Dica</summary>
+              Dados de documento (ex.: RG) identificam diretamente a pessoa. O conjunto deve ser tratado antes de publicação.
+            </details>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:10px">
+            <button class="btn" id="s3-check">Validar resposta</button>
+            <button class="btn ghost" id="s3-next" disabled>Avançar ▶</button>
+          </div>
+          <p id="s3-msg" class="notice" style="margin-top:10px;display:none"></p>
+        </div>
+        <div class="card">
+          <p><strong>Objetivo pedagógico:</strong> diferenciar dados pessoais e aplicar tratamento adequado antes de compartilhar.</p>
+          <ul>
+            <li>Identificação de dado sensível/identificador direto</li>
+            <li>Escolha de técnica: anonimizar ou pseudonimizar</li>
+          </ul>
+          <p class="muted">Chave esperada: <em>ANONIMIZAÇÃO</em></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DESAFIO 4 -->
+    <section id="screen-4" class="screen" aria-labelledby="s4-title">
+      <h2 id="s4-title">Desafio 4 — O Plano de Gestão Espectral (DMP)</h2>
+      <p>Complete o plano de gestão de dados (DMP) com escolhas adequadas para encerrar a maldição.</p>
+      <div class="grid two">
+        <div class="card">
+          <label for="store">Armazenamento/Backup</label>
+          <select id="store">
+            <option value="">Selecione…</option>
+            <option>Drive institucional com backup automático</option>
+            <option>Notebook pessoal sem backup</option>
+          </select>
+
+          <label for="access">Controle de acesso</label>
+          <select id="access">
+            <option value="">Selecione…</option>
+            <option>Acesso por perfis (somente equipe)</option>
+            <option>Link público irrestrito</option>
+          </select>
+
+          <label for="share">Compartilhamento</label>
+          <select id="share">
+            <option value="">Selecione…</option>
+            <option>Repositório com metadados e licença</option>
+            <option>Envio por mensageiro sem registro</option>
+          </select>
+
+          <label for="ret">Retenção/Arquivamento</label>
+          <select id="ret">
+            <option value="">Selecione…</option>
+            <option>Política definida e prazos documentados</option>
+            <option>Deixar até o espaço acabar</option>
+          </select>
+
+          <div class="hint">
+            <details>
+              <summary>Dica</summary>
+              Prefira opções com backup, controle de acesso, metadados/licença no compartilhamento e política de retenção.
+            </details>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:10px">
+            <button class="btn" id="s4-check">Validar DMP</button>
+            <button class="btn ghost" id="s4-next" disabled>Ir para a saída ▶</button>
+          </div>
+          <p id="s4-msg" class="notice" style="margin-top:10px;display:none"></p>
+        </div>
+        <div class="card">
+          <p><strong>Objetivo pedagógico:</strong> reconhecer escolhas adequadas para um plano de gestão de dados.</p>
+          <ul>
+            <li>Armazenamento com backup</li>
+            <li>Acesso por perfis</li>
+            <li>Compartilhamento com metadados e licença</li>
+            <li>Retenção/arquivamento definidos</li>
+          </ul>
+          <p class="muted">Chave esperada: <em>GESTÃO</em></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SAÍDA -->
+    <section id="screen-5" class="screen" aria-labelledby="s5-title">
+      <h2 id="s5-title">Porta Final — Quebre a Maldição</h2>
+      <p>Você reuniu quatro chaves. Combine-as e insira a palavra‑final para libertar os dados.</p>
+      <div class="card">
+        <p><strong>Chaves obtidas:</strong> <span id="keys-list" style="color:var(--warn)">nenhuma</span></p>
+        <label for="final">Palavra‑final</label>
+        <input id="final" type="text" placeholder="Ex.: DADOSSAUDAVEIS ou HALLOWEENDATA" />
+        <div style="margin-top:12px;display:flex;gap:10px">
+          <button class="btn" id="final-check">Abrir a porta</button>
+        </div>
+        <p id="final-msg" class="notice" style="margin-top:10px;display:none"></p>
+      </div>
+    </section>
+
+    <!-- FIM -->
+    <section id="screen-end" class="screen" aria-labelledby="end-title">
+      <h2 id="end-title">🎉 Parabéns! Os dados foram salvos da maldição.</h2>
+      <p>Você concluiu o Escape Room Halloween – Dados Assombrados. Faça o debriefing com sua equipe:
+      <ul>
+        <li>Quais metadados mínimos você incluiria por padrão?</li>
+        <li>Como documentar consentimento e revogação segundo a LGPD?</li>
+        <li>Que técnica usaria para publicar bases que contenham identificadores diretos?</li>
+        <li>Como manter um DMP vivo ao longo do projeto?</li>
+      </ul>
+      <div class="door"><button class="btn ghost" id="replay">Jogar novamente</button></div>
+    </section>
+
+    <p class="footer">Dica do narrador fantasma: pressione <span class="kbd">F11</span> para modo tela cheia. Feliz Halloween! 🦇</p>
+  </main>
+
+  <!-- Overlay de tempo esgotado -->
+  <div class="overlay" id="timeup" role="dialog" aria-modal="true" aria-labelledby="timeup-title" aria-describedby="timeup-desc">
+    <div class="panel">
+      <h2 id="timeup-title">⏳ Tempo esgotado… A maldição persiste!</h2>
+      <p id="timeup-desc">Você pode tentar novamente e salvar os dados do além. Clique abaixo para recomeçar.</p>
+      <div class="door"><button class="btn" id="retry">Tentar novamente</button></div>
+    </div>
+  </div>
+
+  <script>
+    // Utilitários
+    const $ = (sel) => document.querySelector(sel);
+    const show = (id) => document.querySelectorAll('section.screen').forEach(s=>s.classList.toggle('active', s.id===id));
+
+    // Normaliza texto removendo acentos e caixa
+    const normalize = (str) => (str||"")
+      .toString()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu,'')
+      .trim()
+      .toLowerCase();
+
+    // Estado
+    const state = {
+      keys: new Set(),
+      timer: 60*60, // 60 minutos (em segundos)
+      ticking: null
+    };
+
+    function updateKeyUI(){
+      const karr = Array.from(state.keys);
+      $('#key1').classList.toggle('got', state.keys.has('METADADOS'));
+      $('#key2').classList.toggle('got', state.keys.has('CONSENTIMENTO'));
+      $('#key3').classList.toggle('got', state.keys.has('ANONIMIZACAO'));
+      $('#key4').classList.toggle('got', state.keys.has('GESTAO'));
+      $('#keys-list') && ($('#keys-list').textContent = karr.length ? karr.join(', ') : 'nenhuma');
+    }
+
+    function startTimer(){
+      clearInterval(state.ticking);
+      const render = () => {
+        const m = Math.floor(state.timer/60).toString().padStart(2,'0');
+        const s = (state.timer%60).toString().padStart(2,'0');
+        $('#countdown').textContent = `${m}:${s}`;
+        if(state.timer<=0){
+          clearInterval(state.ticking);
+          $('#timeup').classList.add('show');
+        }
+        state.timer--; // decrement after render
+      };
+      render();
+      state.ticking = setInterval(render, 1000);
+    }
+
+    function resetAll(){
+      state.keys = new Set();
+      state.timer = 60*60;
+      updateKeyUI();
+      ['author','date','format','license','purpose','retention','contact','optout','s3-col','s3-action','store','access','share','ret','final']
+        .forEach(id=>{
+          const el = document.getElementById(id);
+          if(!el) return;
+          if(el.type==='checkbox') el.checked=false;
+          else if(el.tagName==='SELECT') el.selectedIndex=0;
+          else el.value='';
+        });
+      document.querySelectorAll('[id$="-msg"]').forEach(m=>{m.style.display='none'; m.className='notice'; m.textContent='';});
+      document.querySelectorAll('button[id$="-next"]').forEach(b=>b.disabled=true);
+      $('#keys-list') && ($('#keys-list').textContent='nenhuma');
+    }
+
+    // Intro
+    $('#start').addEventListener('click', ()=>{ show('screen-1'); startTimer(); });
+
+    // S1 check
+    $('#s1-check').addEventListener('click', ()=>{
+      const author = $('#author').value.trim();
+      const date = $('#date').value.trim();
+      const format = normalize($('#format').value);
+      const license = normalize($('#license').value);
+      const okFormat = /^(csv|json|xlsx|png|jpg|jpeg|txt|parquet|xml)$/.test(format);
+      const okLic = /(cc\s?by|cc0|creative\s?commons|mit)/.test(license);
+      const msg = $('#s1-msg');
+      if(author && date && okFormat && okLic){
+        state.keys.add('METADADOS'); updateKeyUI();
+        msg.className='notice ok'; msg.textContent='Perfeito! A chave METADADOS foi revelada.'; msg.style.display='block';
+        $('#s1-next').disabled=false;
+      } else {
+        msg.className='notice warn'; msg.innerHTML='Revise os campos: <ul><li>Formato deve ser um dos: CSV/JSON/XLSX/PNG/JPG/TXT/PARQUET/XML</li><li>Licença: CC BY, CC0 ou MIT</li></ul>'; msg.style.display='block';
+      }
+    });
+    $('#s1-next').addEventListener('click', ()=> show('screen-2'));
+
+    // S2 check
+    $('#s2-check').addEventListener('click', ()=>{
+      const purpose = $('#purpose').value.trim();
+      const retention = $('#retention').value.trim();
+      const contact = $('#contact').value.trim();
+      const optout = $('#optout').checked;
+      const msg = $('#s2-msg');
+      if(purpose && retention && contact && optout){
+        state.keys.add('CONSENTIMENTO'); updateKeyUI();
+        msg.className='notice ok'; msg.textContent='Excelente! A chave CONSENTIMENTO foi revelada.'; msg.style.display='block';
+        $('#s2-next').disabled=false;
+      } else {
+        msg.className='notice warn'; msg.textContent='Falta algum elemento do consentimento (finalidade, contato, prazo e direito de revogação).'; msg.style.display='block';
+      }
+    });
+    $('#s2-next').addEventListener('click', ()=> show('screen-3'));
+
+    // S3 check
+    $('#s3-check').addEventListener('click', ()=>{
+      const col = normalize($('#s3-col').value);
+      const act = normalize($('#s3-action').value);
+      const msg = $('#s3-msg');
+      const isRG = col.includes('rg') || col.includes('documento');
+      const good = (act==='anonimizacao' || act==='pseudonimizacao') && isRG;
+      if(good){
+        state.keys.add('ANONIMIZACAO'); updateKeyUI();
+        msg.className='notice ok'; msg.textContent='Correto! Trate o identificador direto. Chave ANONIMIZAÇÃO revelada.'; msg.style.display='block';
+        $('#s3-next').disabled=false;
+      } else {
+        msg.className='notice err'; msg.textContent='Resposta incorreta. Identifique a coluna de identificador direto (ex.: RG) e selecione Anonimização ou Pseudonimização.'; msg.style.display='block';
+      }
+    });
+    $('#s3-next').addEventListener('click', ()=> show('screen-4'));
+
+    // S4 check
+    $('#s4-check').addEventListener('click', ()=>{
+      const store = $('#store').selectedIndex===1; // opção boa
+      const access = $('#access').selectedIndex===1;
+      const share = $('#share').selectedIndex===1;
+      const ret = $('#ret').selectedIndex===1;
+      const msg = $('#s4-msg');
+      if(store && access && share && ret){
+        state.keys.add('GESTAO'); updateKeyUI();
+        msg.className='notice ok'; msg.textContent='DMP sólido! A chave GESTÃO foi revelada.'; msg.style.display='block';
+        $('#s4-next').disabled=false;
+      } else {
+        msg.className='notice warn'; msg.textContent='Escolha as opções com backup, controle de acesso, metadados/licença e política de retenção.'; msg.style.display='block';
+      }
+    });
+    $('#s4-next').addEventListener('click', ()=>{ updateKeyUI(); show('screen-5'); });
+
+    // Final
+    $('#final-check').addEventListener('click', ()=>{
+      const val = normalize($('#final').value).replace(/\s+/g,'');
+      const ok1 = val==='dadossaudaveis';
+      const ok2 = val==='halloweendata';
+      const gotAll = ['METADADOS','CONSENTIMENTO','ANONIMIZACAO','GESTAO'].every(k=>state.keys.has(k));
+      const msg = $('#final-msg');
+      if(!gotAll){
+        msg.className='notice warn'; msg.textContent='Você ainda não reuniu as 4 chaves.'; msg.style.display='block';
+        return;
+      }
+      if(ok1 || ok2){
+        clearInterval(state.ticking);
+        show('screen-end');
+      } else {
+        msg.className='notice err'; msg.textContent='Palavra‑final incorreta. Dica: combine o sentido das 4 chaves ou tente HALLOWEENDATA.'; msg.style.display='block';
+      }
+    });
+
+    // Replay & Retry
+    $('#replay').addEventListener('click', ()=>{ resetAll(); show('screen-intro'); startTimer(); });
+    $('#retry').addEventListener('click', ()=>{ $('#timeup').classList.remove('show'); resetAll(); show('screen-intro'); startTimer(); });
+
+    // Inicializa
+    updateKeyUI();
+  </script>
+</body>
+</html>
